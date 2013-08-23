@@ -146,6 +146,7 @@ apply (Func params varargs body closure) args =
           bindVarArgs arg env = case arg of
                                   Just argName -> liftIO $ bindVars env [(argName, List $ remainingArgs)]
                                   Nothing -> return env
+apply (IOFunc func) args = func args
 
 primitives :: [(String, [LispVal] -> ThrowsError LispVal)]
 primitives = [("+", numericBinOp (+)),
