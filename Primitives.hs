@@ -29,6 +29,19 @@ primitives = [("+", numericBinOp (+)),
               ("mod", numericBinOp mod),
               ("quotient", numericBinOp quot),
               ("remainder", numericBinOp rem),
+              ("symbol?", unaryOp symbolP),
+              ("list?", unaryOp listP),
+              ("string?", unaryOp stringP),
+              ("number?", unaryOp numberP),
+              ("complex?", unaryOp complexP),
+              ("real?", unaryOp realP),
+              ("rational?", unaryOp rationalP),
+              ("integer?", unaryOp integerP),
+              ("boolean?", unaryOp boolP),
+              ("char?", unaryOp charP),
+              ("null?", unaryOp nullP),
+              ("symbol->string", unaryOp symbol2string),
+              ("string->symbol", unaryOp string2symbol),
               ("=", numBoolBinOp (==)),
               ("<", numBoolBinOp (<)),
               (">", numBoolBinOp (>)),
@@ -73,17 +86,20 @@ boolBinOp unpacker op args = if length args /= 2
                                         right <- unpacker $ args !! 1
                                         return $ Bool $ left `op` right
 
-numBoolBinOp  = boolBinOp unpackNum
-strBoolBinOp  = boolBinOp unpackStr
+unaryOp :: (LispVal -> ThrowsError LispVal) -> [LispVal] -> ThrowsError LispVal
+unaryOp f [v] = f v
+
+numBoolBinOp :: (Integer -> Integer -> Bool) -> [LispVal] -> ThrowsError LispVal
+numBoolBinOp = boolBinOp unpackNum
+
+strBoolBinOp :: (String -> String -> Bool) -> [LispVal] -> ThrowsError LispVal
+strBoolBinOp = boolBinOp unpackStr
+
+boolBoolBinOp :: (Bool -> Bool -> Bool) -> [LispVal] -> ThrowsError LispVal
 boolBoolBinOp = boolBinOp unpackBool
 
 unpackNum :: LispVal -> ThrowsError Integer
 unpackNum (Number n) = return n
-unpackNum (String n) = let parsed = reads n in
-                           if null parsed
-                              then throwError $ TypeMismatch "number" $ String n
-                              else return $ fst $ parsed !! 0
-unpackNum (List [n]) = unpackNum n
 unpackNum notNum     = throwError $ TypeMismatch "number" notNum
 
 unpackStr :: LispVal -> ThrowsError String
@@ -95,6 +111,68 @@ unpackStr notString  = throwError $ TypeMismatch "string" notString
 unpackBool :: LispVal -> ThrowsError Bool
 unpackBool (Bool b) = return b
 unpackBool notBool  = throwError $ TypeMismatch "boolean" notBool
+
+symbolP :: LispVal -> ThrowsError LispVal
+symbolP (Atom _) = return $ Bool True
+symbolP _        = return $ Bool False
+
+stringP :: LispVal -> ThrowsError LispVal
+stringP (String _) = return $ Bool True
+stringP _          = return $ Bool False
+
+numberP :: LispVal -> ThrowsError LispVal
+numberP (Complex _)  = return $ Bool True
+numberP (Float _)    = return $ Bool True
+numberP (Rational _) = return $ Bool True
+numberP (Number _)   = return $ Bool True
+numberP _            = return $ Bool False
+
+complexP :: LispVal -> ThrowsError LispVal
+complexP (Complex _)  = return $ Bool True
+complexP (Float _)    = return $ Bool True
+complexP (Rational _) = return $ Bool True
+complexP (Number _)   = return $ Bool True
+complexP _            = return $ Bool False
+
+realP :: LispVal -> ThrowsError LispVal
+realP (Float _)    = return $ Bool True
+realP (Rational _) = return $ Bool True
+realP (Number _)   = return $ Bool True
+realP _            = return $ Bool False
+
+rationalP :: LispVal -> ThrowsError LispVal
+rationalP (Rational _) = return $ Bool True
+rationalP (Number _)   = return $ Bool True
+rationalP _            = return $ Bool False
+
+integerP :: LispVal -> ThrowsError LispVal
+integerP (Number _)   = return $ Bool True
+integerP _            = return $ Bool False
+
+boolP :: LispVal -> ThrowsError LispVal
+boolP (Bool _) = return $ Bool True
+boolP _        = return $ Bool False
+
+charP :: LispVal -> ThrowsError LispVal
+charP (Character _) = return $ Bool True
+charP _             = return $ Bool False
+
+nullP :: LispVal -> ThrowsError LispVal
+nullP (List []) = return $ Bool True
+nullP _         = return $ Bool False
+
+listP :: LispVal -> ThrowsError LispVal
+listP (List _)          = return $ Bool True
+listP (DottedList _ _ ) = return $ Bool True
+listP _                 = return $ Bool False
+
+symbol2string :: LispVal -> ThrowsError LispVal
+symbol2string (Atom s) = return $ String s
+symbol2string _        = return $ String ""
+
+string2symbol :: LispVal -> ThrowsError LispVal
+string2symbol (String s) = return $ Atom s
+string2symbol _          = return $ Atom ""
 
 car :: [LispVal] -> ThrowsError LispVal
 car [List (x:_)] = return x
