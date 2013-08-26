@@ -10,6 +10,7 @@ module LispTypes
 
 
 import Control.Monad.Error ( Error(..), ErrorT(..) )
+import Data.Complex
 import Data.IORef ( IORef(..) )
 import System.IO ( Handle(..) )
 import Text.ParserCombinators.Parsec ( ParseError(..) )
@@ -25,6 +26,10 @@ data LispVal = Atom String
              | Number Integer
              | String String
              | Bool Bool
+             | Character Char
+             | Float Double
+             | Rational Rational
+             | Complex (Complex Double)
              | Port Handle
              | PrimitiveFunc ([LispVal] -> ThrowsError LispVal)
              | IOFunc ([LispVal] -> IOThrowsError LispVal)
@@ -49,8 +54,14 @@ showVal :: LispVal -> String
 showVal (String contents) = "\"" ++ contents ++ "\""
 showVal (Atom name) = name
 showVal (Number contents) = show contents
+showVal (Complex contents) = show contents
+showVal (Float contents) = show contents
+showVal (Rational contents) = show contents
 showVal (Bool True) = "#t"
 showVal (Bool False) = "#f"
+showVal (Character ' ') = "#\\space"
+showVal (Character '\n') = "#\\newline"
+showVal (Character char) = "#\\" ++ [char]
 showVal (List contents) = "(" ++ unwordsList contents ++ ")"
 showVal (DottedList head tail) = "(" ++ unwordsList head ++ " . " ++ showVal tail ++ ")"
 showVal (Port _) = "<IO port>"
