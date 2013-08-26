@@ -29,7 +29,8 @@ eval env (List [Atom "if", pred, conseq, alt]) =
     do result <- eval env pred
        case result of
          Bool False -> eval env alt
-         otherwise  -> eval env conseq
+         Bool True  -> eval env conseq
+         otherwise  -> throwError $ TypeMismatch "boolean" pred
 eval env (List [Atom "set!", Atom var, form]) =
     eval env form >>= setVar env var
 eval env (List [Atom "define", Atom var, form]) =

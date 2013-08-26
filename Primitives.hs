@@ -55,6 +55,10 @@ primitives = [("+", numericBinOp (+)),
               ("string>?", strBoolBinOp (>)),
               ("string<=?", strBoolBinOp (<=)),
               ("string>=?", strBoolBinOp (>=)),
+              ("string-length", stringLength),
+              ("string-ref", stringRef),
+              ("substring", substring),
+              ("string-append", stringAppend),
               ("car", car),
               ("cdr", cdr),
               ("cons", cons),
@@ -174,6 +178,31 @@ string2symbol :: LispVal -> ThrowsError LispVal
 string2symbol (String s) = return $ Atom s
 string2symbol _          = return $ Atom ""
 
+stringLength :: [LispVal] -> ThrowsError LispVal
+stringLength [(String s)] = return . Number . toInteger $ length s
+stringLength [notString]  = throwError $ TypeMismatch "string" notString
+stringLength badArgList   = throwError $ NumArgs 1 badArgList
+
+stringRef :: [LispVal] -> ThrowsError LispVal
+stringRef [(String s), (Number k)] = return . String $ [s !! (fromIntegral k)]
+stringRef [(String s), notNumber]  = throwError $ TypeMismatch "number" notNumber
+stringRef [notString, (Number k)]  = throwError $ TypeMismatch "string" notString
+stringRef badArgList               = throwError $ NumArgs 2 badArgList
+
+substring :: [LispVal] -> ThrowsError LispVal
+substring [(String s), (Number n), (Number m)] = return . String $ take (fromIntegral m) $ drop (fromIntegral n) s
+substring [(String s), (Number n), notNumber]  = throwError $ TypeMismatch "number" notNumber
+substring [(String s), notNumber, (Number m)]  = throwError $ TypeMismatch "number" notNumber
+substring [notString, (Number n), (Number m)]  = throwError $ TypeMismatch "string" notString
+substring badArgList                           = throwError $ NumArgs 3 badArgList
+
+stringAppend :: [LispVal] -> ThrowsError LispVal
+stringAppend args
+        | all isString args = mapM unpackStr args >>= return . String . concat
+        | otherwise         = throwError $ TypeMismatch "list of strings" (List args)
+    where isString (String _) = True
+          isString _          = False
+
 car :: [LispVal] -> ThrowsError LispVal
 car [List (x:_)] = return x
 car [DottedList (x:_) _] = return x
@@ -200,11 +229,7 @@ eqv [(Number arg1), (Number arg2)] = return $ Bool $ arg1 == arg2
 eqv [(String arg1), (String arg2)] = return $ Bool $ arg1 == arg2
 eqv [(Atom arg1), (Atom arg2)] = return $ Bool $ arg1 == arg2
 eqv [(DottedList xs x), (DottedList ys y)] = eqv [List $ xs ++ [x], List $ ys ++ [y]]
-eqv [(List arg1), (List arg2)] = return $ Bool $ (length arg1 == length arg2) &&
-                                                 (and $ map eqvPair $ zip arg1 arg2)
-    where eqvPair (x1, x2) = case eqv [x1, x2] of
-                                Left err -> False
-                                Right (Bool val) -> val
+eqv [l1@(List arg1), l2@(List arg2)] = eqList eqv [l1, l2]
 eqv [_, _] = return $ Bool False
 eqv badArgList = throwError $ NumArgs 2 badArgList
 
@@ -218,12 +243,21 @@ unpackEquals arg1 arg2 (AnyUnpacker unpacker) =
     `catchError` (const $ return False)
 
 equal :: [LispVal] -> ThrowsError LispVal
+equal [(DottedList xs x), (DottedList ys y)] = equal [List $ xs ++ [x], List $ ys ++ [y]]
+equal [l1@(List arg1), l2@(List arg2)] = eqList equal [l1, l2]
 equal [arg1, arg2] =
         do primitiveEquals <- liftM or $ mapM (unpackEquals arg1 arg2)
                               [AnyUnpacker unpackNum, AnyUnpacker unpackStr, AnyUnpacker unpackBool]
            eqvEquals <- eqv [arg1, arg2]
            return $ Bool $ (primitiveEquals || let (Bool x) = eqvEquals in x)
 equal badArgList = throwError $ NumArgs 2 badArgList
+
+eqList :: ([LispVal] -> ThrowsError LispVal) -> [LispVal] -> ThrowsError LispVal
+eqList eqvFunc [(List arg1), (List arg2)] = return $ Bool $ (length arg1 == length arg2) &&
+                                                            (and $ map eqvPair $ zip arg1 arg2)
+    where eqvPair (x1, x2) = case eqvFunc [x1, x2] of
+                                Left err -> False
+                                Right (Bool val) -> val
 
 applyProc :: [LispVal] -> IOThrowsError LispVal
 applyProc [func, List args] = apply func args
